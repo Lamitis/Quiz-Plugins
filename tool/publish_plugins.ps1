@@ -50,16 +50,16 @@ $distDir = Join-Path $Root 'dist'
 if (-not (Test-Path -LiteralPath $distDir)) { throw "找不到 dist：$distDir（先跑 tool/build_plugins.ps1）" }
 
 # ---- 0. 收集要发布的包（id / version / 文件 / 哈希 都以本地文件为准）----
-$pluginsDir = Join-Path $Root 'plugins'
+# v1.1 起插件目录平铺在仓库根（与 publish-plugins.yml 一致）
 $items = @()
-foreach ($dir in (Get-ChildItem -LiteralPath $pluginsDir -Directory | Sort-Object Name)) {
+foreach ($dir in (Get-ChildItem -LiteralPath $Root -Directory | Sort-Object Name)) {
     $manifestPath = Join-Path $dir.FullName 'manifest.json'
     if (-not (Test-Path -LiteralPath $manifestPath)) { continue }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $id = "$($manifest.id)"
     $version = "$($manifest.version)"
     if ([string]::IsNullOrWhiteSpace($id) -or [string]::IsNullOrWhiteSpace($version)) { continue }
-    $zipName = "$id-$version.natsume-plugin.zip"
+    $zipName = "$($dir.Name)-$version.natsume-plugin.zip"
     $zipPath = Join-Path $distDir $zipName
     if (-not (Test-Path -LiteralPath $zipPath)) { throw "缺少包：$zipPath（先跑 tool/build_plugins.ps1）" }
     $items += [pscustomobject]@{

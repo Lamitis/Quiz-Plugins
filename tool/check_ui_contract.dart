@@ -41,7 +41,9 @@ String readNormalized(File file) =>
 
 void main() {
   var failures = 0;
-  final pluginDirs = Directory('plugins')
+  // 插件目录平铺在仓库根（与 publish-plugins.yml 一致）：根下带清单的目录即插件
+  final repoRoot = File.fromUri(Platform.script).parent.parent;
+  final pluginDirs = repoRoot
       .listSync()
       .whereType<Directory>()
       .where((d) =>

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  把 plugins/ 下每个插件目录打成 .natsume-plugin.zip，并输出 sha256 与登记表条目。
+  把仓库根下每个插件目录打成 .natsume-plugin.zip，并输出 sha256 与登记表条目。
 
 .DESCRIPTION
   打包口径按《PLUGIN_DEVELOPMENT.md》第 3 节：
@@ -43,8 +43,8 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 if ([string]::IsNullOrWhiteSpace($Root)) {
     $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 }
-$pluginsDir = Join-Path $Root 'plugins'
-if (-not (Test-Path -LiteralPath $pluginsDir)) { throw "找不到插件目录：$pluginsDir" }
+# v1.1 起插件目录平铺在仓库根（与 .github/workflows/publish-plugins.yml 一致）：
+# 根下带 manifest.json 的目录就算一个插件。不再有 plugins/ 这一层。
 if ([string]::IsNullOrWhiteSpace($OutDir)) { $OutDir = Join-Path $Root 'dist' }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
@@ -55,7 +55,7 @@ if (-not $SkipValidate) {
         Write-Warning '没找到 dart，跳过校验（打包仍会继续）'
     } else {
         Write-Host '== 校验插件 =='
-        & dart run (Join-Path $Root 'tool\validate_plugins.dart') $pluginsDir
+        & dart run (Join-Path $Root 'tool\validate_plugins.dart') $Root
         if ($LASTEXITCODE -ne 0) { throw '校验未通过，已中止打包' }
         Write-Host ''
     }
@@ -63,7 +63,7 @@ if (-not $SkipValidate) {
 
 # ---- 2. 打包 ----
 $entries = New-Object System.Collections.ArrayList
-foreach ($dir in (Get-ChildItem -LiteralPath $pluginsDir -Directory | Sort-Object Name)) {
+foreach ($dir in (Get-ChildItem -LiteralPath $Root -Directory | Sort-Object Name)) {
     $manifestPath = Join-Path $dir.FullName 'manifest.json'
     if (-not (Test-Path -LiteralPath $manifestPath)) { continue }
 
@@ -81,7 +81,9 @@ foreach ($dir in (Get-ChildItem -LiteralPath $pluginsDir -Directory | Sort-Objec
         continue
     }
 
-    $zipName = "$id-$version.natsume-plugin.zip"
+    # 包名用**目录名**（= 插件名），与 publish-plugins.yml 产出的资产名一致，
+    # 这样手动打包和 CI 打包给出的下载文件同名，登记表不用跟着改。
+    $zipName = "$($dir.Name)-$version.natsume-plugin.zip"
     $zipPath = Join-Path $OutDir $zipName
     if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 

@@ -1,8 +1,8 @@
-# plugins/ · 第三方插件包
+# 插件包说明（PLUGINS）
 
-本目录是**插件包源码**（声明式：`manifest.json` + 提示词 + 知识库资产 + 示例题库），
-不是 App 代码。装法见每个插件自己的 `README.md`；能力边界与可行性判断见
-[`FEASIBILITY.md`](./FEASIBILITY.md)。
+仓库根下的每个目录就是一个**插件包源码**（声明式：`manifest.json` + 提示词 + 知识库资产 +
+示例题库），不是 App 代码。装法见每个插件自己的 `README.md`；能力边界与可行性判断见
+[`FEASIBILITY.md`](./FEASIBILITY.md)；发版流程见 [`../PUBLISH_GUIDE.md`](../PUBLISH_GUIDE.md)。
 
 | 目录 | id | 版本 | 一句话 | 主程序里的入口（`ui_extensions`） | 关键资产 |
 | --- | --- | --- | --- | --- | --- |
@@ -15,8 +15,8 @@
 ## 1. 校验
 
 ```powershell
-dart run tool/validate_plugins.dart            # 校验 plugins/ 下所有插件
-dart run tool/validate_plugins.dart plugins/variant-generator   # 只校验一个
+dart run tool/validate_plugins.dart            # 校验仓库根下所有插件
+dart run tool/validate_plugins.dart variant-generator   # 只校验一个
 dart run tool/check_ui_contract.dart           # 用宿主真实解析器 + 模拟填槽跑一遍对接
 ```
 

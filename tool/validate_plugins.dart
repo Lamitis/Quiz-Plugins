@@ -9,8 +9,8 @@
 //   渲染器是否在白名单内、模板里用到的占位符是否都在 `contexts` 里声明过。
 //
 // 用法：
-//   dart run tool/validate_plugins.dart                      # 校验 plugins/
-//   dart run tool/validate_plugins.dart plugins/variant-generator   # 只校验一个
+//   dart run tool/validate_plugins.dart                      # 校验仓库根下所有插件目录
+//   dart run tool/validate_plugins.dart variant-generator     # 只校验一个
 //
 // 退出码：0 = 全过（可能有警告）；1 = 有错误。
 
@@ -189,12 +189,14 @@ void main(List<String> args) {
   stdout.writeln('结果：通过（有警告）');
 }
 
-/// 默认插件根：优先 `./plugins`，否则按脚本位置回溯到仓库根的 `plugins/`。
+/// 默认插件根：**仓库根**。
+///
+/// v1.1 起不再有 `plugins/` 这一层——每个插件就是仓库根下的一个目录
+/// （`cheat-sheet-generator/`、`variant-generator/`），与
+/// `.github/workflows/publish-plugins.yml` 找文件夹的口径保持一致。
 Directory defaultRoot() {
-  final cwd = Directory('plugins');
-  if (cwd.existsSync()) return cwd;
   final scriptDir = File.fromUri(Platform.script).parent;
-  return Directory(_join(scriptDir.parent.path, 'plugins'));
+  return scriptDir.parent;
 }
 
 /// 根目录下所有含清单的子目录（按名字排序，输出稳定）

@@ -1,0 +1,245 @@
+# ============================================================
+# 单仓多插件（Monorepo）自动打包发版
+#
+# 触发：推送形如 <插件名>-v<主>.<次>.<修> 的 tag，例如
+#     git tag cheat-sheet-v1.1.0 && git push origin cheat-sheet-v1.1.0
+#
+# 它做的事（全程在 Shell 里）：
+#   1. 从 tag 解析插件名与版本号；
+#   2. 在仓库根找该插件目录（允许用短别名：cheat-sheet → cheat-sheet-generator）；
+#   3. 校验 manifest.json 在目录根、且 version 与 tag 一致；
+#   4. `zip -r` 打包（不含外层目录，manifest.json 落在包根，条目名用 `/`）；
+#   5. 算 sha256 并写进日志与 Step Summary；
+#   6. 用同一个 tag 建 Release，把 zip 当 asset 上传。
+#
+# 为什么不直接上传 dist/ 里的现成包：Release 必须由**该 tag 的源码**产出，
+# 否则「tag 指向的内容」和「下载到的内容」会对不上（dist/ 只是本地打包的对照产物）。
+#
+# 幂等：Release 已存在时只补传缺失的资产；同名资产已存在且 sha256 相同就跳过，
+#       sha256 不同则失败——发布后覆盖资产会让老客户端把包当坏包丢弃。
+# ============================================================
+name: publish-plugins
+
+on:
+  push:
+    tags:
+      # 只收「插件名-v版本号」形式的 tag；格式不对的在第一步就报错退出
+      - '*-v*'
+
+permissions:
+  contents: write # 建 Release / 传 asset 需要
+
+concurrency:
+  group: publish-plugins-${{ github.ref_name }} # 同一个 tag 只跑一次
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出触发 tag 的代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 需要 tag 指向的提交历史
+          ref: ${{ github.ref_name }}
+
+      # ---------- 1. 解析 tag ----------
+      - name: 1) 从 tag 提取插件名与版本号
+        id: parse
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^(.+)-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::tag 格式不对：$TAG。应为 <插件名>-v<主>.<次>.<修>，例如 cheat-sheet-v1.1.0"
+            exit 1
+          fi
+          NAME="${BASH_REMATCH[1]}"
+          VERSION="${BASH_REMATCH[2]}"
+          echo "tag=$TAG 插件名前缀=$NAME 版本号=$VERSION"
+          {
+            echo "### 1. 解析 tag"
+            echo ""
+            echo "| tag | 插件名前缀 | 版本号 |"
+            echo "| --- | --- | --- |"
+            echo "| \`$TAG\` | \`$NAME\` | \`$VERSION\` |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # ---------- 2. 找插件目录 ----------
+      - name: 2) 在仓库根定位插件目录
+        id: folder
+        shell: bash
+        env:
+          NAME: ${{ steps.parse.outputs.name }}
+        run: |
+          set -euo pipefail
+          FOLDER=""
+          # ① 同名目录优先（tag 写全名时走这条）
+          if [[ -f "$NAME/manifest.json" ]]; then
+            FOLDER="$NAME"
+          else
+            # ② 短别名：找唯一一个以「<名字>-」开头且带清单的目录
+            #    （cheat-sheet → cheat-sheet-generator）；工具/文档目录不算插件
+            CANDIDATES=()
+            while IFS= read -r d; do
+              [[ -n "$d" ]] && CANDIDATES+=("$d")
+            done < <(find . -mindepth 1 -maxdepth 1 -type d -printf '%f\n' \
+                       | grep -E "^${NAME}(-|$)" | sort || true)
+            KEPT=()
+            for c in "${CANDIDATES[@]}"; do
+              [[ -f "$c/manifest.json" ]] && KEPT+=("$c")
+            done
+            if [[ ${#KEPT[@]} -eq 1 ]]; then
+              FOLDER="${KEPT[0]}"
+            elif [[ ${#KEPT[@]} -gt 1 ]]; then
+              echo "::error::前缀「$NAME」匹配到多个插件目录：${KEPT[*]}；请用完整目录名打 tag"
+              exit 1
+            fi
+          fi
+
+          if [[ -z "$FOLDER" ]]; then
+            echo "::error::仓库根下没有插件目录「$NAME」（也没有以 $NAME- 开头且带 manifest.json 的目录）"
+            echo "仓库根现有目录："
+            find . -mindepth 1 -maxdepth 1 -type d -printf '  %f\n' | sort
+            exit 1
+          fi
+
+          echo "插件目录：$FOLDER"
+          {
+            echo "### 2. 定位目录"
+            echo ""
+            echo "\`$NAME\` → \`$FOLDER/\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "folder=$FOLDER" >> "$GITHUB_OUTPUT"
+
+      # ---------- 3. 校验清单 ----------
+      - name: 3) 校验 manifest.json（在包根、版本与 tag 一致）
+        shell: bash
+        env:
+          FOLDER: ${{ steps.folder.outputs.folder }}
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$FOLDER/manifest.json" ]]; then
+            echo "::error::$FOLDER/ 缺少 manifest.json（宿主加载器只在包根认它）"
+            exit 1
+          fi
+          read -r PLUGIN_ID MANIFEST_VERSION < <(python3 - "$FOLDER/manifest.json" <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1], encoding='utf-8-sig'))
+          print(m.get('id', ''), m.get('version', ''))
+          PY
+          )
+          echo "manifest.id=$PLUGIN_ID  manifest.version=$MANIFEST_VERSION"
+          if [[ "$MANIFEST_VERSION" != "$VERSION" ]]; then
+            echo "::error::tag 里的版本号 $VERSION 与 manifest.json 的 version $MANIFEST_VERSION 不一致"
+            exit 1
+          fi
+          {
+            echo "### 3. 清单校验"
+            echo ""
+            echo "- id：\`$PLUGIN_ID\`"
+            echo "- version：\`$MANIFEST_VERSION\`（与 tag 一致 ✅）"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ---------- 4. 打包 + 哈希 ----------
+      - name: 4) 打包并计算 sha256
+        id: pack
+        shell: bash
+        env:
+          FOLDER: ${{ steps.folder.outputs.folder }}
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          set -euo pipefail
+          ASSET="${FOLDER}-${VERSION}.natsume-plugin.zip"
+          OUT="$RUNNER_TEMP/$ASSET"
+
+          # cd 进插件目录再 zip：包内路径相对目录本身，manifest.json 落在包根
+          ( cd "$FOLDER" && zip -r -q -X "$OUT" . -x '.git/*' -x '.DS_Store' )
+
+          # 自检 1：条目名必须用 `/`（Linux 的 zip 遵守规范，这里兜一层）
+          if unzip -Z1 "$OUT" | grep -q '\\'; then
+            echo "::error::包内条目名含反斜杠：宿主在 Android / Linux 上会把 kb/* 与 prompts/* 当成文件名，按钮会失效"
+            exit 1
+          fi
+          # 自检 2：清单必须在包根（不能多套一层目录）
+          if ! unzip -Z1 "$OUT" | grep -Fxq 'manifest.json'; then
+            echo "::error::manifest.json 不在包根（把目录内容打进去，不要多套一层文件夹）"
+            exit 1
+          fi
+
+          echo "包内条目："
+          unzip -Z1 "$OUT" | sort | sed 's/^/  /'
+
+          SHA256="$(sha256sum "$OUT" | cut -d' ' -f1)"
+          SIZE="$(du -h "$OUT" | cut -f1)"
+          echo "asset=$ASSET"
+          echo "sha256=$SHA256"
+          {
+            echo "### 4. 打包结果"
+            echo ""
+            echo "| 资产 | 大小 | sha256 |"
+            echo "| --- | --- | --- |"
+            echo "| \`$ASSET\` | $SIZE | \`$SHA256\` |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      # ---------- 5. Release + 上传 ----------
+      - name: 5) 创建 Release 并上传资产
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ steps.pack.outputs.asset }}
+          ZIP_PATH: ${{ steps.pack.outputs.path }}
+          SHA256: ${{ steps.pack.outputs.sha256 }}
+          FOLDER: ${{ steps.folder.outputs.folder }}
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          set -euo pipefail
+          NOTES="$(printf '%s\n' \
+            "插件 \`$FOLDER\` v$VERSION" \
+            "" \
+            "- 资产：\`$ASSET\`" \
+            "- sha256：\`$SHA256\`" \
+            "" \
+            "安装：主程序「世界总览 → 导入插件」选这个 zip；或经 Natsume-Registry 安装。" \
+            "这是声明式包：不含可执行代码，按钮 / 取数 / AI 请求 / 渲染全在宿主。")"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在，检查资产…"
+            if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$ASSET"; then
+              TMP="$(mktemp -d)"
+              gh release download "$TAG" --pattern "$ASSET" --dir "$TMP"
+              REMOTE_SHA="$(sha256sum "$TMP/$ASSET" | cut -d' ' -f1)"
+              if [[ "$REMOTE_SHA" == "$SHA256" ]]; then
+                echo "同名资产已存在且 sha256 一致，跳过上传（可安全重跑）"
+                exit 0
+              fi
+              echo "::error::同名资产已存在但 sha256 不同（远端 $REMOTE_SHA / 本次 $SHA256）。发布后不覆盖资产，请升版本号重发。"
+              exit 1
+            fi
+            gh release upload "$TAG" "$ZIP_PATH"
+          else
+            gh release create "$TAG" "$ZIP_PATH" \
+              --title "$TAG" \
+              --notes "$NOTES" \
+              --verify-tag
+          fi
+
+          {
+            echo "### 5. 发布完成"
+            echo ""
+            echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            echo ""
+            echo "下载地址（登记表用这个）："
+            echo "\`https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$ASSET\`"
+          } >> "$GITHUB_STEP_SUMMARY"

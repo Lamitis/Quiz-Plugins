@@ -17,3 +17,7 @@ New Text Document*.txt
 
 # 打包脚本的中间产物（发布包本身要提交，见 dist/*.zip）
 dist/registry.entries.json
+
+# python 工具（tool/dryrun_publish_workflow.py）的缓存
+__pycache__/
+*.pyc

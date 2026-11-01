@@ -10,27 +10,29 @@ NatsumeQuizMaster 的**官方插件包**源码与发布仓库。
 
 | 目录 | id | 版本 | 一句话 | 宿主里的入口 |
 | --- | --- | --- | --- | --- |
-| `plugins/cheat-sheet-generator/` | `natsume.cheat-sheet-generator` | 1.1.0 | 错题 + 薄弱知识点 → 一页小抄（公式 / 避坑 / 口诀） | 错题本右上角「考前小抄」「掌心卡」 |
-| `plugins/variant-generator/` | `natsume.variant-generator` | 1.1.0 | 同一考点换一套陷阱，出一道变体题，答案默认收起 | 答题页解析区「举一反三」、错题本右上角「错题变体」 |
+| `cheat-sheet-generator/` | `natsume.cheat-sheet-generator` | 1.1.0 | 错题 + 薄弱知识点 → 一页小抄（公式 / 避坑 / 口诀） | 错题本右上角「考前小抄」「掌心卡」 |
+| `variant-generator/` | `natsume.variant-generator` | 1.1.0 | 同一考点换一套陷阱，出一道变体题，答案默认收起 | 答题页解析区「举一反三」、错题本右上角「错题变体」 |
 
 两个插件都要求宿主 **v1.38.0+**（`min_app_version`）。
 
 ## 目录
 
 ```
-plugins/<plugin>/
+<plugin-name>/             # 仓库根下的目录就是一个插件（平铺，不套 plugins/）
 ├── manifest.json      # 清单：id / 版本 / 能力 / 资产 / ui_extensions
 ├── prompt.md          # 系统口径（宿主注入解析与追问）
 ├── prompts/           # 功能模板（宿主按 ui_extensions 填槽）
 ├── kb/                # 可导入知识库的参考资料
 ├── sample_bank.json   # 示例题库（可选）
 └── README.md          # 安装 / 槽位 / 降级方案 / 隐私说明
+.github/workflows/publish-plugins.yml   # tag 触发：打包 + 建 Release + 传资产
 tool/
 ├── validate_plugins.dart    # 静态校验：清单字段、能力白名单、资产、示例题库、ui_extensions 契约
 ├── check_ui_contract.dart   # 用宿主真实解析器 + 模拟填槽跑一遍对接
-├── build_plugins.ps1        # 打包（ZipArchive，条目名强制 `/`）
-└── publish_plugins.ps1      # 发 Release + 写 Natsume-Registry 登记条目
-dist/                  # 发布产物（zip + SHA256SUMS），Release 直接上传这些文件
+├── build_plugins.ps1        # 本地打包（ZipArchive，条目名强制 `/`）
+└── publish_plugins.ps1      # 无 CI 时的手动兜底：发 Release + 写登记条目
+docs/                  # PLUGINS.md（插件与契约说明）、FEASIBILITY.md（可行性评估）
+dist/                  # 本地打包产物（zip + SHA256SUMS），作对照与留档
 ```
 
 `plugin_ui_extension.dart` 是宿主 `lib/services/plugins/plugin_ui_extension.dart` 的
@@ -55,14 +57,26 @@ powershell -ExecutionPolicy Bypass -File tool/build_plugins.ps1
 2. **条目名用 `/`**：宿主在 Android / Linux 上把条目名直接当相对路径落盘，`\` 会让
    `prompts/`、`kb/` 变成文件名而不是目录，装上去「按钮没反应」。
 
-## 发布
+## 发布（tag 即发版）
 
-1. `tool/build_plugins.ps1` → `dist/<name>-<version>.natsume-plugin.zip` + SHA256SUMS。
-2. 在 GitHub 建对应 tag 的 Release，上传 `dist/` 里的 zip。
-3. 往 [Natsume-Registry](https://github.com/Lamitis/Natsume-Registry) 提 `plugins/<id>.json`
-   （7 个字段，`download_url` + `sha256` 必须与资产一致）。
+推送形如 `<插件名>-v<版本号>` 的 tag，CI 自动打包 + 建 Release + 传资产：
 
-**发布后不要覆盖同名资产**：sha256 一变，老客户端会把它当坏包丢弃；升级请发新版本。
+```bash
+git tag cheat-sheet-v1.2.0
+git push origin cheat-sheet-v1.2.0
+```
+
+工作流见 [`.github/workflows/publish-plugins.yml`](./.github/workflows/publish-plugins.yml)；
+完整规则（tag 命名、目录映射、版本一致性校验、失败排查、手动兜底）见
+[`PUBLISH_GUIDE.md`](./PUBLISH_GUIDE.md)。
+
+要点：
+
+- 资产名 = **目录名** + 版本号：`cheat-sheet-generator-1.1.0.natsume-plugin.zip`。
+- tag 里的版本号必须等于 `manifest.json` 的 `version`，否则第一步就失败。
+- **发布后不要覆盖同名资产**：sha256 一变，老客户端会把它当坏包丢弃；升级请发新版本。
+- 之后往 [Natsume-Registry](https://github.com/Lamitis/Natsume-Registry) 提 `plugins/<id>.json`
+  （7 个字段，`download_url` / `sha256` 用 Release 资产的实际值）。
 
 ## 许可
 
