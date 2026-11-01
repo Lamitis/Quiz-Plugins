@@ -98,10 +98,20 @@ Release 建好后，下载地址与哈希就是 `Natsume-Registry` 里要写的�
 ```json
 {
   "id": "natsume.cheat-sheet-generator",
+  "name": "考前 5 分钟小抄生成器",
+  "author": "NatsumeQuizMaster",
+  "version": "1.2.0",
+  "description": "……（≤240 字）",
   "download_url": "https://github.com/Lamitis/Quiz-Plugins/releases/download/cheat-sheet-v1.2.0/cheat-sheet-generator-1.2.0.natsume-plugin.zip",
-  "sha256": "<Release 资产的实际 sha256>"
+  "sha256": "<Release 资产的实际 sha256>",
+  "category": "考前复习",
+  "tags": ["小抄", "错题"]
 }
 ```
 
 - 文件名必须是 `plugins/<id>.json`（`validate_pr.py` 强制「文件名 == id」）。
 - 哈希以**下载回来的资产**为准（CI 日志 / Step Summary / Release 说明里都有）。
+- `category` / `tags` / `permissions` / `repo_url` / `changelog_url` 是**可选**字段（v1.36 起客户端支持）：
+  不写就是默认值；`category` 不写或为空时市场显示「未分类」。市场的分类筛选栏**完全按数据生成**，
+  写一个新分类就自动多一项，客户端不需要任何配置。
+
