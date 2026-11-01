@@ -1,0 +1,70 @@
+{
+  "format": "natsume-quiz-questions",
+  "name": "小抄生成器·示例题（医学基础）",
+  "count": 5,
+  "questions": [
+    {
+      "title": "正常成人安静状态下，心率的主要调节方式是？",
+      "options": [
+        "体液调节",
+        "自身调节",
+        "神经调节",
+        "局部代谢产物调节"
+      ],
+      "correct_answer": "C",
+      "analysis": "安静状态下心率主要受自主神经（心迷走神经与心交感神经）调节，其中迷走神经的紧张性活动占主导，是心率最重要的调节方式。",
+      "question_type": "single_choice",
+      "knowledge_point": "心血管生理"
+    },
+    {
+      "title": "下列关于动作电位特点的描述，正确的是？",
+      "options": [
+        "刺激强度越大，动作电位幅度越高",
+        "动作电位可沿细胞膜不衰减传导",
+        "动作电位可以总和",
+        "动作电位幅度与细胞外 K⁺ 浓度无关"
+      ],
+      "correct_answer": "B",
+      "analysis": "动作电位具有“全或无”现象，幅度不随刺激强度改变，也不可总和；其传导为不衰减传导。幅度主要取决于细胞外 Na⁺ 浓度。",
+      "question_type": "single_choice",
+      "knowledge_point": "细胞生理"
+    },
+    {
+      "title": "阿司匹林的主要作用机制是？",
+      "options": [
+        "抑制环氧酶（COX）",
+        "阻断 H₁ 受体",
+        "抑制磷脂酶 A₂",
+        "阻断白三烯受体"
+      ],
+      "correct_answer": "A",
+      "analysis": "阿司匹林通过不可逆乙酰化环氧酶（COX-1/COX-2）活性位点，抑制前列腺素与血栓素 A₂ 的合成，发挥解热、镇痛、抗炎与抗血小板作用。",
+      "question_type": "single_choice",
+      "knowledge_point": "药理学"
+    },
+    {
+      "title": "下列属于糖皮质激素生理作用的有哪些？",
+      "options": [
+        "升高血糖",
+        "促进蛋白质分解",
+        "抑制免疫反应",
+        "促进钙吸收"
+      ],
+      "correct_answer": "A,B,C",
+      "analysis": "糖皮质激素可促进糖异生升高血糖、促进蛋白质分解、抑制免疫与炎症反应；但它减少钙吸收、促进钙排泄，长期使用可致骨质疏松。",
+      "question_type": "multi_choice",
+      "knowledge_point": "内分泌生理"
+    },
+    {
+      "title": "血浆渗透压主要由晶体渗透压构成，其中贡献最大的是 NaCl。",
+      "options": [
+        "对",
+        "错"
+      ],
+      "correct_answer": "对",
+      "analysis": "血浆渗透压约 300 mOsm/L，晶体渗透压占绝大部分，其中 Na⁺ 和 Cl⁻ 数量最多、贡献最大；胶体渗透压主要由白蛋白维持，数值很小但对血管内外水平衡意义重大。",
+      "question_type": "true_false",
+      "knowledge_point": "体液生理"
+    }
+  ]
+}

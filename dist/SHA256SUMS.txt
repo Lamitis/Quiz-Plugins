@@ -1,0 +1,2 @@
+d8890d9131d450d3391ef458b4db86623fc2c5bbce6684e0617f11be07c8ecf8  cheat-sheet-generator-1.1.0.natsume-plugin.zip
+d76d285bd16dbb4712f42a8e1339e03be454d748d0e7e5e2cadc3ab0ec629d74  variant-generator-1.1.0.natsume-plugin.zip

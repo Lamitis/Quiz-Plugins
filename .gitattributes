@@ -1,0 +1,8 @@
+# 文本统一 LF（插件提示词会被宿主按 UTF-8 读，行尾不影响行为，但 diff 要干净）
+* text=auto eol=lf
+
+# 发布包与图标是二进制，不要做行尾转换（改了字节，sha256 就变了）
+*.zip binary
+*.png binary
+*.ico binary
+*.jar binary

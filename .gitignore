@@ -1,0 +1,19 @@
+# 任务草稿（个人笔记，不发布）
+New Text Document*.txt
+
+# 宿主源码参考副本：只保留 tool/check_ui_contract.dart 真正 import 的
+# plugin_ui_extension.dart；其余副本留在主程序仓库里，别在这边重复维护
+/plugin_action_engine.dart
+/plugin_action_sheet.dart
+/plugin_loader.dart
+/plugin_prompt_service.dart
+/plugin_registry.dart
+/plugin_stats_service.dart
+/builtin_plugins.dart
+/world_service.dart
+
+# 内置插件的官方素材（1.4MB，属于主程序仓库 assets/plugins/official/）
+/official/
+
+# 打包脚本的中间产物（发布包本身要提交，见 dist/*.zip）
+dist/registry.entries.json
